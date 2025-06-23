@@ -1,0 +1,140 @@
+# Get complete df and plots
+```{r}
+setwd(dirname(rstudioapi::documentPath()))
+
+# library(ggplot2)
+# library(patchwork)
+# library(dplyr)
+# library(reshape2)
+library(tidyverse)
+library(ctsmTMB)
+# devtools::document("~/github/ctsmTMB")
+
+ordered_yTs_list <- c("yT5", "yT4", "yT3", "yT2", "yT1", "yT0")
+num_regions_every_month <- c(7,3,7)
+names <- c("2024_May", "2024_June", "2025_March")
+
+region_table = tribble(
+  ~region, ~t_start,  ~t_end,
+  ##----2024_May----##
+  "1", "2024-05-27 17:00:00", "2024-05-28 08:20:00",
+  "2", "2024-05-28 10:30:00",  "2024-05-28 13:00:00",
+  "3", "2024-05-28 17:00:00", "2024-05-29 07:00:00",
+  "4", "2024-05-29 11:00:00",  "2024-05-29 13:48:00",
+  "5", "2024-05-29 14:00:00",  "2024-05-29 15:15:00",
+  "6", "2024-05-29 15:22:00",  "2024-05-29 22:00:00",
+  "7", "2024-05-30 00:00:00", "2024-05-30 09:00:00",
+  ##----2024_June----##
+  "8", "2024-06-25 23:05:00", "2024-06-26 08:20:00",
+  "9", "2024-06-26 17:00:00",  "2024-06-27 21:21:00",
+  "10", "2024-06-27 23:00:00", "2024-06-28 11:40:00",
+  ##----2025_March----##
+  "11", "2025-03-05 11:40:00", "2025-03-05 12:32:00",
+  "12", "2025-03-05 12:50:00",  "2025-03-05 13:56:00",
+  "13", "2025-03-05 14:16:00", "2025-03-05 14:40:00",
+  "14", "2025-03-06 10:00:00", "2025-03-06 11:00:00",
+  "15", "2025-03-06 12:00:00", "2025-03-06 12:30:00",
+  "16", "2025-03-06 14:00:00", "2025-03-06 15:15:00",
+  "17", "2025-03-06 17:00:00", "2025-03-07 00:00:00",
+) |>
+  mutate(
+    t_start = as.POSIXct(t_start, tz = "UTC"),
+    t_end = as.POSIXct(t_end, tz = "UTC"),
+  )
+
+i <- 1
+group_i <- 1
+for (num_regions_this_month in num_regions_every_month){
+  csv <- read_csv(sprintf("%s.csv", names[group_i]))
+  
+  region_table_slice <- region_table[i:(i + num_regions_this_month - 1),]
+  
+  # informative info on x axis in the graph
+  region_table_slice |>
+    mutate(description = sprintf("Region %s is from %s to %s", region, t_start, t_end)) |>
+    pull(description) |>
+    paste(collapse = "\n") -> xstring
+  
+  # plot all
+  df_all_tidy <- csv |> 
+      select(time, metric, value) |> 
+      mutate(metric = case_when(
+        metric == "T_abs_out_1 - [°C]" ~ "yT5",
+        metric == "T_pack_top_2 - [°C]" ~ "yT4",
+        metric == "T_pack_mid_3 - [°C]" ~ "yT3",
+        metric == "T_pack_bot_4 - [°C]" ~ "yT2",
+        metric == "T_abs_tank_5 - [°C]" ~ "yT1",
+        metric == "A010_BT01 - [°C]" ~ "yT0",
+        .default = metric)
+      ) |> 
+      mutate(t = as.numeric(time - time[1])) |>
+      arrange(time, metric) |>
+      relocate(time, t, metric, value)
+  
+  df_all <- df_all_tidy |>
+  pivot_wider(names_from = metric, values_from = value) |>
+  relocate(yT0, yT1, yT2, yT3, yT4, yT5, .after=t)
+
+  # For plotting
+  df_all_tidy_plot <- df_all_tidy |>
+    filter(metric %in% ordered_yTs_list)
+  
+  df_all_tidy_plot$metric <- factor(df_all_tidy_plot$metric, levels = ordered_yTs_list) # reorder legend
+  
+  ggplot(data = df_all_tidy_plot, mapping = aes(time, value, group = metric, color = metric)) + 
+      geom_line() +
+      geom_rect(data = region_table_slice, aes(xmin=t_start, xmax=t_end, ymin=0, ymax=Inf),inherit.aes = FALSE, fill = "pink", alpha = 0.5) + 
+      labs(x = sprintf("Time from %s to %s\n%s", min(df_all_tidy$time), max(df_all_tidy$time), xstring), 
+           y = "Temperature",
+           title = "Evolution of temperature at five different spots in absorber", 
+           subtitle = "yT1 to yT5 - Temperature at probes from bottom to top\nyT0 - Temperature at Absorber Process Tank\n(Numbering for the regions is in increasing order from left to right)")
+  
+  ggsave(sprintf("plots/%s.png", names[group_i]))
+  
+  # For every region
+  for (row in seq_len(num_regions_this_month)){
+    
+    tmp <- region_table_slice |> slice(row)
+    
+    df_tidy <- csv |> 
+      select(time, metric, value) |> 
+      mutate(metric = case_when(
+        metric == "T_abs_out_1 - [°C]" ~ "yT5",
+        metric == "T_pack_top_2 - [°C]" ~ "yT4",
+        metric == "T_pack_mid_3 - [°C]" ~ "yT3",
+        metric == "T_pack_bot_4 - [°C]" ~ "yT2",
+        metric == "T_abs_tank_5 - [°C]" ~ "yT1",
+        metric == "A010_BT01 - [°C]" ~ "yT0",
+        .default = metric)
+      ) |> 
+      filter(time >= tmp$t_start & time <= tmp$t_end) |>
+      mutate(t = as.numeric(time - time[1])) |>
+      arrange(time, metric) |>
+      relocate(time, t, metric, value)
+    
+    df <- df_tidy |>
+      pivot_wider(names_from = metric, values_from = value) |>
+      relocate(yT0, yT1, yT2, yT3, yT4, yT5, .after=t)
+  
+    write_excel_csv(df, sprintf("csv/df complete %s.csv", tmp$region))
+    
+    # plotting
+    df_tidy_plot <- df_tidy |>
+      filter(metric %in% ordered_yTs_list)
+    
+    df_tidy_plot$metric <- factor(df_tidy_plot$metric, levels = ordered_yTs_list) # reorder legend
+    
+    ggplot(data = df_tidy_plot, mapping = aes(time, value, group = metric, color = metric)) +
+      geom_line() +
+      labs(x = sprintf("Time from %s to %s", tmp$t_start, tmp$t_end),
+           y = "Temperature",
+          title = sprintf("Evolution of temperature at five different spots in absorber on region %s", tmp$region),
+           subtitle = "yT1 to yT5 - Temperature at probes from bottom to top\nyT0 - Temperature at Absorber Process Tank")
+  
+    ggsave(sprintf("plots/%s_region_%s.png", names[group_i], tmp$region))
+  }
+  
+  i <- i + num_regions_this_month
+  group_i <- group_i + 1
+}
+```

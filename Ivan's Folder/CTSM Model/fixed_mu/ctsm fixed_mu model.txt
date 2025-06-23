@@ -1,0 +1,35 @@
+ctsmTMB model object:              
+States       3
+Diffusions   3
+Observations 3
+Inputs       1
+Parameters   9
+
+System Equations:
+
+	 dT4 ~ (k4 * (mu - T4) + P4) * dt + sigma_x4 * dw4 
+	 dT3 ~ (k * (T4 - T3) + P3) * dt + sigma_x * dw3 
+	 dT2 ~ (k * (T3 - T2) + P2) * dt + sigma_x * dw2 
+
+Observation Equations:
+
+	 yT4:  yT4 ~ T4 + e 	 e ~ N(0, sigma_y^2) 
+	 yT3:  yT3 ~ T3 + e 	 e ~ N(0, sigma_y^2) 
+	 yT2:  yT2 ~ T2 + e 	 e ~ N(0, sigma_y^2) 
+
+Algebraic Relations:
+
+	 k ~ exp(logk) 
+	 k4 ~ exp(logk4) 
+	 sigma_x ~ exp(logsigma_x) 
+	 sigma_x4 ~ exp(logsigma_x4) 
+	 P4 ~ P40 - P_loss * (T4 - 25) 
+	 P3 ~ P30 - P_loss * (T3 - 25) 
+	 P2 ~ P20 - P_loss * (T2 - 25) 
+
+
+Free Parameters:
+	 logk, logk4, P40, P30, P20, P_loss, logsigma_x, logsigma_x4
+
+Fixed Parameters:
+	 sigma_y

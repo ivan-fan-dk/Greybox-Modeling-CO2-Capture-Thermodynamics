@@ -1,0 +1,6 @@
+                                       nll df       AIC      RMSE
+dynamic_mu                       -500.5084 10 -981.0168 0.5610274
+dynamic_mu_no_k4_sigma_x4        -170.1554  8 -324.3109 0.5353189
+dynamic_mu_no_P_loss             -467.3260  9 -916.6520 0.7953852
+dynamic_mu_no_k4_sigma_x4_P_loss -131.2854  7 -248.5708 0.8008241
+dynamic_mu_yT1                   -493.2715 10 -966.5431 0.6311430
